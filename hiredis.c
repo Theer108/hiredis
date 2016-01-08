@@ -34,7 +34,13 @@
 #include "fmacros.h"
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
+
+#ifndef WIN32
+#	include <unistd.h>
+#else
+#	include <io.h>
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
@@ -657,9 +663,14 @@ int redisReconnect(redisContext *c) {
     if (c->connection_type == REDIS_CONN_TCP) {
         return redisContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
                 c->timeout, c->tcp.source_addr);
-    } else if (c->connection_type == REDIS_CONN_UNIX) {
+
+    }
+#ifndef WIN32
+	else if (c->connection_type == REDIS_CONN_UNIX) {
         return redisContextConnectUnix(c, c->unix_sock.path, c->timeout);
-    } else {
+    }
+#endif
+	else {
         /* Something bad happened here and shouldn't have. There isn't
            enough information in the context to reconnect. */
         __redisSetError(c,REDIS_ERR_OTHER,"Not enough information to reconnect");
@@ -724,6 +735,8 @@ redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
     return c;
 }
 
+#ifndef WIN32
+
 redisContext *redisConnectUnix(const char *path) {
     redisContext *c;
 
@@ -759,6 +772,7 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
     redisContextConnectUnix(c,path,NULL);
     return c;
 }
+#endif
 
 redisContext *redisConnectFd(int fd) {
     redisContext *c;

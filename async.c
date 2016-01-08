@@ -32,7 +32,14 @@
 #include "fmacros.h"
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
+
+#ifndef WIN32
+#	include <strings.h>
+#else
+#	define strcasecmp stricmp
+#	define strncasecmp strnicmp
+#endif
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>

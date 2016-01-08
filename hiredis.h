@@ -35,7 +35,14 @@
 #define __HIREDIS_H
 #include "read.h"
 #include <stdarg.h> /* for va_list */
-#include <sys/time.h> /* for struct timeval */
+
+#ifndef WIN32
+#	include <sys/time.h> /* for struct timeval */
+#else
+#	include <winsock2.h>
+#	include <WS2tcpip.h>
+#endif
+
 #include <stdint.h> /* uintXX_t, etc */
 #include "sds.h" /* for sds */
 
@@ -79,6 +86,10 @@
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
  * SO_REUSEADDR is being used. */
 #define REDIS_CONNECT_RETRIES  10
+
+#ifdef WIN32
+#	define strerror_r(errno,buf,len) strerror_s(buf,len,errno)
+#endif
 
 /* strerror_r has two completely different prototypes and behaviors
  * depending on system issues, so we need to operate on the error buffer
