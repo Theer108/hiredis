@@ -37,8 +37,6 @@
 
 #ifndef WIN32
 #	include <unistd.h>
-#else
-#	include <io.h>
 #endif
 
 #include <assert.h>
@@ -408,7 +406,11 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     pos = sprintf(cmd,"*%d\r\n",argc);
     for (j = 0; j < argc; j++) {
-        pos += sprintf(cmd+pos,"$%zu\r\n",sdslen(curargv[j]));
+#ifdef WIN32
+        pos += sprintf(cmd+pos,"$%llu\r\n",sdslen(curargv[j]));
+#else
+		pos += sprintf(cmd + pos, "$%zu\r\n", sdslen(curargv[j]));
+#endif
         memcpy(cmd+pos,curargv[j],sdslen(curargv[j]));
         pos += sdslen(curargv[j]);
         sdsfree(curargv[j]);
@@ -558,7 +560,11 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     pos = sprintf(cmd,"*%d\r\n",argc);
     for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
-        pos += sprintf(cmd+pos,"$%zu\r\n",len);
+#ifndef WIN32
+        pos += sprintf(cmd+pos,"$%lu\r\n",len);
+#else
+		pos += sprintf(cmd + pos, "$%zu\r\n", len);
+#endif
         memcpy(cmd+pos,argv[j],len);
         pos += len;
         cmd[pos++] = '\r';
@@ -598,6 +604,19 @@ redisReader *redisReaderCreate(void) {
 static redisContext *redisContextInit(void) {
     redisContext *c;
 
+#ifdef _WIN32
+	WORD wVersionRequested = MAKEWORD(2, 0);
+	WSADATA wsaData;
+	int ret;
+	
+	ret = WSAStartup(wVersionRequested, &wsaData);
+	if (ret != 0) {
+		fprintf(stderr, "error: WSAStartup() failed: %d\n", ret);
+		return NULL;
+		
+	}
+#endif
+
     c = calloc(1,sizeof(redisContext));
     if (c == NULL)
         return NULL;
@@ -623,7 +642,11 @@ void redisFree(redisContext *c) {
     if (c == NULL)
         return;
     if (c->fd > 0)
+#ifdef WIN32
+		closesocket(c->fd);
+#else
         close(c->fd);
+#endif
     if (c->obuf != NULL)
         sdsfree(c->obuf);
     if (c->reader != NULL)
@@ -651,7 +674,11 @@ int redisReconnect(redisContext *c) {
     memset(c->errstr, '\0', strlen(c->errstr));
 
     if (c->fd > 0) {
+#ifndef WIN32
         close(c->fd);
+#else
+		closesocket(c->fd);
+#endif
     }
 
     sdsfree(c->obuf);
@@ -813,7 +840,11 @@ int redisBufferRead(redisContext *c) {
     if (c->err)
         return REDIS_ERR;
 
+#ifndef WIN32
     nread = read(c->fd,buf,sizeof(buf));
+#else
+	nread = recv(c->fd, buf, sizeof(buf), 0);
+#endif
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
@@ -850,7 +881,13 @@ int redisBufferWrite(redisContext *c, int *done) {
         return REDIS_ERR;
 
     if (sdslen(c->obuf) > 0) {
+		int len = sdslen(c->obuf);
+#ifndef WIN32
         nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
+#else
+		nwritten = send(c->fd, c->obuf, sdslen(c->obuf), 0);
+#endif
+
         if (nwritten == -1) {
             if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
                 /* Try again later */
