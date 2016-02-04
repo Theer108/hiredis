@@ -232,7 +232,7 @@ static int redisContextWaitReady(redisContext *c, const struct timeval *timeout)
 		FD_ZERO(&wfd);
 		FD_SET(c->fd, &wfd);
 
-		if (select(FD_SETSIZE, NULL, &wfd, NULL, toptr) == -1) {
+		if (select(FD_SETSIZE, NULL, &wfd, &wfd, toptr) == -1) {
 			SETERRNO;
 			__redisSetErrorFromErrno(c, REDIS_ERR_IO, "select(2)");
 			close(c->fd);
